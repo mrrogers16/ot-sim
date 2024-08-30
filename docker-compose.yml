@@ -1,0 +1,69 @@
+version: '3.7'
+
+services:
+  wireshark:
+    build:
+      context: .
+      dockerfile: ./Dockerfile.tools
+    image: TODO
+    init: true
+    privileges: true # required for capturing network traffic on host interfaces
+    network_mode: host
+    volumes:
+    - ./configs/docker/tigervnc-wireshark.conf:/etc/supervisor/conf.d/tigervnc-wireshark.conf
+    - ./configs/docker/wireshark.conf:/etc/supervisor/conf.d/wireshark.conf
+  adversary:
+    build:
+      context: .
+      dockerfile: ./Dockerfile.tools
+    image: TODO
+    init: true
+    privileged: true # required for iptables to work
+#   sysctls: # uncomment this section if docker host doesn't already have IP forwarding enabled
+#   - net.ipv4.ip_forward=1
+#   - net.ipv6.conf.all.forwarding=1
+#   - net.ipv6.conf.all.send_redirects=0
+    volumes:
+    - ./configs/docker/tigervnc-adversary.conf:/etc/supervisor/conf.d/tigervnc-adversary.conf
+    - ./scripts/aitm.py:/root/aitm.py
+    - ./scripts/attack.sh:/root/attack.sh
+    ports:
+    - 8090:8080
+    networks:
+      vpc:
+        ipv4_address: 10.11.12.200
+  main-ctlr:
+    image: TODO
+    init: true
+    cap_add:
+    - NET_ADMIN # For Tailscale
+    depends_on:
+    - yaw-ctlr
+    - anemometer
+    - blade-1
+    - blade-2
+    - blade-3
+    volumes:
+    - /lib/modules:/lib/modules:ro  # For Tailscale
+    - /dev/net/tun:dev/net/tun      # For Tailscale
+    - ./configs/ot-sim/main-controller.xml:/etc/ot-sim/config.xml
+    - ./configs/ot-sim/node-red.json:/etc/node-red.json
+    ports:
+    - 1880:1880
+    environment:
+    - OTSIM_TAILSCALE_AUTHKEY=${OTSIM_TAILSCALE_AUTHKEY} # For Tailscale
+    hostname: ${HOSTNAME} # For Tailscale
+    networks:
+      vpc:
+        ipv4_address: 10.11.12.100
+  yaw-ctlr:
+    image: TODO
+    init: true
+    depends_on:
+    - opensearch
+    volumes:
+    - ./configs/ot-sim/yaw-controller.xml:/etc/ot-sim/config.xml
+    networks:
+      - vpc:
+        ipv4_address: 10.11.12.101
+  anemometer:
